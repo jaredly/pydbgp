@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 37
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp
+END
+common.py
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/common.py
+END
+client.py
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/client.py
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/__init__.py
+END
+listcmd.py
+K 25
+svn:wc:ra_dav:version-url
+V 48
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/listcmd.py
+END
+serverBase.py
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/serverBase.py
+END
+_pyclient.py
+K 25
+svn:wc:ra_dav:version-url
+V 50
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_pyclient.py
+END
+server.py
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/server.py
+END
+_client.c
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_client.c
+END

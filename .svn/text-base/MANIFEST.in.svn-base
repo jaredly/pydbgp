@@ -1,0 +1,8 @@
+include setup.py
+include MANIFEST.in
+include dbgpClient.py
+include bin/*.py
+include dbgp/*.py
+include dbgp/_logging/*.py
+include dbgp/_client.c
+exclude dbgp/_client??.c 

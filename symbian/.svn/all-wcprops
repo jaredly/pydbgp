@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 40
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian
+END
+dbgp.rsc
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian/dbgp.rsc
+END
+dbgp.app
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian/dbgp.app
+END
+dbgp.pkg
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian/dbgp.pkg
+END
+debug.py
+K 25
+svn:wc:ra_dav:version-url
+V 49
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian/debug.py
+END
+serial_tcp_redirect.py
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/repos/!svn/ver/1337/dbgp/PyDBGP/symbian/serial_tcp_redirect.py
+END

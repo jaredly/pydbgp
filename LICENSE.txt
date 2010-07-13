@@ -1,0 +1,18 @@
+PyDBGP is released under the MIT license, available at
+http://www.opensource.org/licenses/mit-license.html
+
+PyDBGP contains the logging module by Vinay Sajip, which is copyright Vinay
+Sajip and under it's own license (see dbgp/_logging/__init__.py).  This is
+contained here for compatibility with pre Python 2.3 versions.
+
+Symbian port
+
+This was an attempt at getting PyDBGP working on the Symbian Series 60.  It
+almost worked, but at the time the Symbian python port had some limitations that
+prevented PyDBGP from working.  Those limitations are now gone, however work
+on this has not proceeded since the first investigation into Python on Symbian.
+
+Files in the symbian directory are under various licenses, see the file headers.
+Files in symbian/lib are from Python, and are under the Python license at
+http://www.python.org/download/releases/2.4.2/license/
+

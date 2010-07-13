@@ -1,0 +1,35 @@
+;
+; Standalone Python for S60 app
+;
+; To create SIS file, do:  makesis dbgp.pkg
+;
+;Languages
+&EN
+;
+;
+; XXX This is a developer key, we need to request a unique key
+#{"dbgp"},(0x05555555),1,0,0
+;
+;Supports Series 60 v 1.2
+;
+(0x101F6F88), 0, 0, 0, {"Series60ProductID"}
+;
+; Files to install:
+
+; debug app
+"debug.py"			-"!:\system\apps\PYTHON\debug.py"
+
+; dependencies
+"lib\cmd.py"			-"!:\system\libs\cmd.py"
+"lib\getopt.py"			-"!:\system\libs\getopt.py"
+"lib\ihooks.py"			-"!:\system\libs\ihooks.py"
+"lib\logging.py"		-"!:\system\libs\logging.py"
+"lib\Queue.py"			-"!:\system\libs\Queue.py"
+"lib\threading.py"		-"!:\system\libs\threading.py"
+
+; dbgp client module
+"..\dbgp\client.py"		-"!:\system\libs\dbgp\client.py"
+"..\dbgp\common.py"		-"!:\system\libs\dbgp\common.py"
+"..\dbgp\listcmd.py"		-"!:\system\libs\dbgp\listcmd.py"
+"..\dbgp\_pyclient.py"		-"!:\system\libs\dbgp\_pyclient.py"
+"..\dbgp\__init__.py"		-"!:\system\libs\dbgp\__init__.py"

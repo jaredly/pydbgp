@@ -1,0 +1,35 @@
+K 25
+svn:wc:ra_dav:version-url
+V 36
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin
+END
+pydbgpd.py
+K 25
+svn:wc:ra_dav:version-url
+V 47
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin/pydbgpd.py
+END
+dbg.py
+K 25
+svn:wc:ra_dav:version-url
+V 43
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin/dbg.py
+END
+pydbgpshell.py
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin/pydbgpshell.py
+END
+pydbgp.py
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin/pydbgp.py
+END
+pydbgpproxy.py
+K 25
+svn:wc:ra_dav:version-url
+V 51
+/repos/!svn/ver/1337/dbgp/PyDBGP/bin/pydbgpproxy.py
+END
