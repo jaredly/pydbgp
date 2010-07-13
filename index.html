@@ -6,6 +6,8 @@
 	<meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
 
 	<title>jabapyth/pydbgp @ GitHub</title>
+	<script type="text/javascript"
+	  src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
 	
 	<style type="text/css">
 		body {
@@ -31,6 +33,14 @@
     .footer { text-align:center; padding-top:30px; font-style: italic; }
 	</style>
 	
+	<script>
+$(function(){
+  var ttoggle = $('div.toggler');
+  ttoggle.each(function(){
+    var node = $(this).siblings('div.togglee').hide();
+    $(this).click(function(){node.slideToggle('slow');});
+  });
+});
 </head>
 
 <body>
@@ -53,12 +63,45 @@
     </div>
 
     <h2>Install</h2>
-<p>Here's the short version:
-
-Grab the repo
-put (or symlink) the "dbgp" directory somewhere python can find it (if nothing else, your friendly site packages directory).
-put (or symlink) the "bin/pydbgp" executable (make sure it has the right permissions) somewhere bash can find it... /usr/bin/ should work.
-</p>
+    <p>Here's the short version:
+      <ul>
+	<li>Grab the repo</li>
+	<li>put (or symlink) the "dbgp" directory somewhere python can find it (if nothing else, your friendly site packages directory).</li>
+	<li>put (or symlink) the "bin/pydbgp" executable (make sure it has the right permissions) somewhere bash can find it... /usr/bin/ should work.</li>
+      </ul>
+    </p>
+    <p>And... the longer version. First, here's my setup:
+    <ul>
+      <li>
+	<div class="toggler">~/python is on my PYTHONPATH</div>
+	<div class="togglee">
+	  As I use <a href="http://www.zsh.org/">zsh</a> as my shell, I have
+	  <pre>export PYTHONPATH=.:~/python</pre>
+	  in my ~/.zshrc. It should work for bash too (in your ~/.bashrc).
+	</div>
+      </li>
+      <li>
+	<div class="toggler">~/bin is on my PATH</div>
+	<div class="togglee">
+	  Again, in my .zshrc I've got
+	  <pre>PATH=$PATH:~/bin;
+export PATH</pre>
+	</div>
+      </li>
+      <li>
+	And ~/clone is the directory where I put all my cloned repos.
+      </li>
+    </ul>
+    Now for a nice script:
+<pre>
+cd ~/clone
+git clone git://github.com/jabapyth/pydbgp
+ln -s ~/clone/pydbgp/dbgp ~/python
+ln -s ~/clone/pydbgp/bin/pydbgp ~/bin
+</pre>
+    See, that wasn't so bad...<br/>
+    To check your install, do
+    <pre>python -c'import dbgp'</pre> and <pre>pydbgp</pre> on the cmd line.
 <h2>License</h2>
 <p>MIT</p>
 <h2>Authors</h2>
