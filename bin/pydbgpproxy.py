@@ -73,14 +73,6 @@ import threading
 import sys
 
 
-if sys.version_info[0] <= 2:
-    pythonlib = "pythonlib"
-elif sys.version_info[0] == 3:
-    pythonlib = "python3lib"
-else:
-    import dbgp.common
-    raise dbgp.common.DBGPError("Unsupported Python version %d" % (sys.version_info[0],))
-
 def _get_dbgp_client_pythonlib_path():
     """Find the DBGP Python client library in the common install
     configuration. Returns None if it could not be found.
@@ -92,7 +84,7 @@ def _get_dbgp_client_pythonlib_path():
         this_dir = dirname(abspath(sys.argv[0]))
     candidate_paths = [
         dirname(this_dir), # Komodo source tree layout
-        join(dirname(this_dir), pythonlib),
+        join(dirname(this_dir), "pythonlib"),
     ]
     for candidate_path in candidate_paths:
         landmark = join(candidate_path, "dbgp", "__init__.py")

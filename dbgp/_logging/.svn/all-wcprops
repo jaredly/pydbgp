@@ -1,0 +1,23 @@
+K 25
+svn:wc:ra_dav:version-url
+V 46
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_logging
+END
+__init__.py
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_logging/__init__.py
+END
+handlers.py
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_logging/handlers.py
+END
+config.py
+K 25
+svn:wc:ra_dav:version-url
+V 56
+/repos/!svn/ver/1337/dbgp/PyDBGP/dbgp/_logging/config.py
+END

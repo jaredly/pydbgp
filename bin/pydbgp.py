@@ -70,12 +70,6 @@ import getopt
 import socket
 import types
 
-is_v2 = sys.version_info[0] == 2
-if is_v2:
-    pythonlib = "pythonlib"
-else:
-    pythonlib = "python3lib"
-
 def _get_dbgp_client_pythonlib_path():
     """Find the DBGP Python client library in the common install
     configuration. Returns None if it could not be found.
@@ -87,7 +81,7 @@ def _get_dbgp_client_pythonlib_path():
         this_dir = dirname(abspath(sys.argv[0]))
     candidate_paths = [
         dirname(this_dir), # Komodo source tree layout
-        join(dirname(this_dir), pythonlib),
+        join(dirname(this_dir), "pythonlib"),
     ]
     for candidate_path in candidate_paths:
         landmark = join(candidate_path, "dbgp", "__init__.py")
@@ -113,21 +107,14 @@ class IOStream:
     def __init__(self, origStream, encoding):
         self.__dict__['_origStream'] = origStream
         self.__dict__['_encoding'] = encoding
-        self._encodeOnOutput = (sys.version_info[0] == 2)
     
     def write(self, s):
-        global DBGPHideChildren
-        origDBGPHideChildren = DBGPHideChildren
-        DBGPHideChildren = DBGPDebugDebugger != DBGP_STOPPABLE_ALWAYS
         try:
-            if self._encodeOnOutput and type(s)==types.UnicodeType:
-                try:
-                    s = s.encode(self._encoding)
-                except:
-                    pass
-            self._origStream.write(s)
-        finally:
-            DBGPHideChildren = origDBGPHideChildren
+            if type(s)==types.UnicodeType:
+                s = s.encode(self._encoding)
+        except:
+            pass
+        self._origStream.write(s)
 
     def writelines(self, lines):
         text = ''.join(lines)
@@ -176,15 +163,14 @@ def main(argv):
     import locale
     codeset = locale.getdefaultlocale()[1]
     idekey = getenv('USER', getenv('USERNAME', ''))
-    if is_v2:
-        try:
-            if codeset:
-                idekey = idekey.decode(codeset)
-            else:
-                idekey = idekey.decode()
-        except (UnicodeDecodeError, LookupError), e:
-            log.warn("unable to decode idekey %r"%idekey)
-            pass # nothing we can do if defaultlocale is wrong
+    try:
+        if codeset:
+            idekey = idekey.decode(codeset)
+        else:
+            idekey = idekey.decode()
+    except (UnicodeDecodeError, LookupError), e:
+        log.warn("unable to decode idekey %r"%idekey)
+        pass # nothing we can do if defaultlocale is wrong
     host = '127.0.0.1'
     port = 9000
     preloadScript = None
@@ -193,7 +179,7 @@ def main(argv):
     nodebug = 0
     redirect = 1
     for opt, optarg in optlist:
-        if optarg and is_v2:
+        if optarg:
             try:
                 if codeset:
                     optarg = optarg.decode(codeset)

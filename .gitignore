@@ -1,2 +1,7 @@
+<<<<<<< HEAD
 *.vim.sess
 *.pyc
+=======
+*.pyc
+*.vim.sess
+>>>>>>> from_svn

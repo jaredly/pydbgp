@@ -42,13 +42,10 @@ import thread, threading
 # command line host driver
 import getopt, os, types, StringIO, Queue
 import traceback, re
-import base64, urlparse
+import base64, urlparse, urllib
 import dbgp.listcmd as listcmd
 
 from dbgp.common import *
-import dbgp.common
-dbgp.common.__builtins__['DBGPHideChildren'] = 0
-
 try:
     import logging
 except ImportError:
@@ -103,26 +100,10 @@ StringTypes = [types.StringType,
 HiddenTypes = [types.BuiltinMethodType,
                types.BuiltinFunctionType,
                types.FunctionType,
-               types.TypeType, # py2to3 => type 
+               types.UnboundMethodType,
+               types.TypeType,
+               types.ClassType,
                types.ModuleType]
-if sys.version_info[0] >= 3:
-    _is_py3 = True
-    _byte0 = '\0'.encode()
-    _supports_keyed_sort = True
-    def _encode_response(response):
-        # response is already utf-8-encoded
-        return ('%d' % len(response)).encode('utf-8') + _byte0 + response + _byte0
-else:
-    _is_py3 = False
-    #Assume version 2 -- Python 1.* not supported.
-    HiddenTypes += [types.UnboundMethodType,
-                    types.ClassType]
-    _supports_keyed_sort = sys.version_info[1] >= 4
-    def _encode_response(response):
-        # response is already utf-8-encoded
-        packet = '%d\0%s\0' % (len(response), response)
-        return packet.encode()
-
 if hasattr('', '__add__'):
     HiddenTypes.append(type(''.__add__))
 
@@ -152,16 +133,6 @@ if os.name == 'java': # for jython
 else:
     isWindows = sys.platform[0:3].lower() == 'win'
 
-# This is needed due to http://bugs.python.org/issue6496
-# Not all instances of urllib.pathname2url and urllib.url2pathname
-# get converted.
-if _is_py3:
-    from urllib.request import pathname2url as urllib_pathname2url
-    from urllib.request import url2pathname as urllib_url2pathname
-else:
-    from urllib import pathname2url as urllib_pathname2url
-    from urllib import url2pathname as urllib_url2pathname
-
 def url2pathname( url ):
     decomposedURL = urlparse.urlparse( url, 'file:///' )
 
@@ -177,7 +148,7 @@ def url2pathname( url ):
         import nturl2path
         return nturl2path.url2pathname(path)
     else:
-        return urllib_url2pathname( path )
+        return urllib.url2pathname( path )
 
 def pathname2url( pathname ):
     if os.name == 'java' and isWindows:
@@ -186,7 +157,7 @@ def pathname2url( pathname ):
         import nturl2path
         return 'file:' + nturl2path.pathname2url( os.path.abspath( pathname ) )        
     else:
-        return 'file:' + urllib_pathname2url( os.path.abspath( pathname ) )
+        return 'file:' + urllib.pathname2url( os.path.abspath( pathname ) )
 
 # Only used by jython
 def findOpenPort(start, retries):
@@ -258,22 +229,6 @@ def _getAttrStr(attrs):
         s += ' %s=%s' % (attr, quoteattr(value))
     return s
 
-def _filename_from_frame_py2(frame):
-    if frame.f_code and frame.f_code.co_filename:
-        return frame.f_code.co_filename
-    return None
-
-def _filename_from_frame_py3(frame):
-    co = frame.f_code
-    if not co.co_filename or co.co_filename == "<string>":
-        return frame.f_globals.get('__file__', co.co_filename)
-    return co.co_filename
-
-if _is_py3:
-    _filename_from_frame = _filename_from_frame_py3
-else:
-    _filename_from_frame = _filename_from_frame_py2
-
 def _get_stack_data(item):
     frame, lineno = item
     where = None
@@ -284,9 +239,9 @@ def _get_stack_data(item):
             where = frame.f_globals['__name__']
     if not where:
         where = frame.f_code.co_name or '?'
-    codeFileName = _filename_from_frame(frame)
+    codeFileName = frame.f_code.co_filename
 
-    if codeFileName.startswith('<'):
+    if codeFileName[0] == '<':
         filename = codeFileName
         lineno = 0
     elif os.path.isfile(codeFileName):
@@ -325,7 +280,7 @@ def _stack_repr(stack):
         print "%d %s:%d:%s" % (level,filename, lineno, where)
 
 def _hide_stack(f):
-    return DBGPDebugDebugger == DBGP_STOPPABLE_NEVER and f.f_globals.has_key('DBGPHide')
+    return DBGPDebugDebugger == 0 and f.f_globals.has_key('DBGPHide')
 
 def _print_tb(tb, limit=None, file=None):
     """Print up to 'limit' stack trace entries from the traceback 'tb'.
@@ -389,8 +344,6 @@ def _print_exc(limit=None, file=None):
     finally:
         etype = value = tb = None
 
-#py3 problems -- code doesn't contain filename...
-# No one calls this function anyway...
 def _code_repr(code,name=None):
     if code:
         if name is None: name = code.co_name
@@ -412,9 +365,8 @@ def _code_repr(code,name=None):
 def _frame_repr(frame,name=None):
     if name is None: name = ""
     if frame:
-        fname = _filename_from_frame(frame)
-        if fname:
-            fname = os.path.split(fname)[1]
+        if frame.f_code and frame.f_code.co_filename:
+            fname = os.path.split(frame.f_code.co_filename)[1]
         else:
             fname = "??"
         v = Property('frame','frame',frame)
@@ -437,13 +389,12 @@ def _format_exception_only():
         return str(sys.exc_info()[0]) + ": " + str(sys.exc_info()[1])
 
 def _frame_name_dump(frame):
-    fname = _filename_from_frame(frame) or "??"
     if frame.f_globals.has_key('__name__'):
         return "%s at %s:%d" % (frame.f_globals['__name__'], 
-                                fname,
+                                frame.f_code.co_filename, 
                                 frame.f_lineno)
     else:
-        return "?? at %s:%d" % (fname, 
+        return "?? at %s:%d" % (frame.f_code.co_filename, 
                                 frame.f_lineno)
 
 def _safe_apply(what_failed, func, *args):
@@ -640,16 +591,9 @@ class h_execfile(h_base):
         try:
             exec "import site\n\n" in globals, locals
             del globals['site']
-            if _is_py3:
-                globals['__file__'] = file
-                contents = open(file).read()
-                if tracer:
-                    tracer.starttrace()
-                exec(contents, globals, locals)
-            else:
-                if tracer:
-                    tracer.starttrace()
-                execfile(file, globals, locals)
+            if tracer:
+                tracer.starttrace()
+            execfile(file, globals, locals)
         finally:
             if tracer:
                 tracer.stoptrace()
@@ -677,7 +621,7 @@ class StreamOut:
     def write(self, s):
         global DBGPHideChildren
         origDBGPHideChildren = DBGPHideChildren
-        DBGPHideChildren = DBGPDebugDebugger != DBGP_STOPPABLE_ALWAYS
+        DBGPHideChildren = DBGPDebugDebugger is not 2
         try:
             if type(s)==types.UnicodeType:
                 s = s.encode('UTF-8')
@@ -726,13 +670,13 @@ class StreamStdin:
 class StreamIn(StringIO.StringIO):
     def __init__(self, origStream, client):
         self.__dict__['_origStream'] = origStream
-        self.__dict__['_read_cv'] = threading.Condition()
         StringIO.StringIO.__init__(self, '')
+        self.__dict__['_read_cv'] = threading.Condition()
         self.__dict__['_client'] = client
 
     def __getattr__(self, attr):
         if self.__dict__.has_key(attr):
-            return getattr(self.__dict__, attr)
+            return getattr(self,attr)
         return getattr(self._origStream, attr)
     
     def stop(self):
@@ -856,18 +800,19 @@ else:
     TimedQueue = Queue.Queue
 
 class CommandError(Exception):
-    """A simple exception that knows how to serialize itself to xml
-    to facilitate sending a DBGP response for an error.
+    """Breakpoint class
+    
+    a simple exception that knows how to serialize itself to xml.
     """
     _cmd_error = '<response xmlns="urn:debugger_protocol_v1" command="%s" transaction_id="%s"><error code="%d"><message><![CDATA[%s]]></message></error></response>'
 
-    def __init__(self, name, tid, errid, msg):
+    def __init__(self, name, tid, errid, message):
         self.name = name
         self.tid = tid
         self.errid = errid
-        self.msg = msg
+        self.message = message
     def __str__(self):
-        return self._cmd_error % (self.name,self.tid,self.errid,self.msg)
+        return self._cmd_error % (self.name,self.tid,self.errid,self.message)
     
 # validation functions used by the backend class
 def _validateBreakpointType(client, bptype):
@@ -990,7 +935,7 @@ class Breakpoint:
                 tExpression = '<expression><![CDATA[%s]]></expression>' % self.cond
             
         bp =  '<breakpoint id="%s" type="%s"' % (self.number, self.type)
-        bp += ' filename="%s" lineno="%s"' % (pathname2url(self.file), self.line)
+        bp += ' filename="%s" lineno="%s"' % (self.file, self.line)
         bp += ' state="%s"' % (self.enabled and 'enabled' or 'disabled')
         bp += ' temporary="%s"' % self.temporary
         if self.hitValue is not None:
@@ -1012,7 +957,7 @@ def canonic(fname):
     canonic = canonicCache.get(fname)
     if canonic:
         return canonic
-    if fname.startswith("<") and fname.endswith(">"):
+    if fname[0] == "<" and fname[-1] == ">":
         canonicCache[fname] = fname
         return fname
     
@@ -1044,7 +989,7 @@ def effective(frame, arg, type):
     that indicates if it is ok to delete a temporary bp.
 
     """
-    file = canonic(_filename_from_frame(frame))
+    file = canonic(frame.f_code.co_filename)
     if not breakpointsByFile.has_key(file):
         return (None, None)
 
@@ -1162,23 +1107,6 @@ def effective(frame, arg, type):
         return (b, 1)
     return (None, None)
 
-if _is_py3:
-    def base64_encodestring(data):
-        """  In Python 3 this method expects bytes and returns bytes,
-        but we need a string, as we're building up a string which
-        we'll eventually encode when writing to a socket
-        """
-        return base64.encodebytes(data).decode()
-    def base64_decodestring(data):
-        """  Again, we're given characters, and need to return characters.
-        """
-        return base64.decodebytes(data.encode()).decode()
-else:
-    def base64_encodestring(data):
-        return base64.encodestring(data)
-    def base64_decodestring(data):
-        return base64.decodestring(data)
-
 class Property:
     """DBGP Python Property class.
 
@@ -1200,12 +1128,6 @@ class Property:
         # be a type from the types module
         self.include_hiddenTypes = include_hiddenTypes
 
-    _ws_ptn = re.compile("[\t\r\n]")
-    def _hex_encode(self, match):
-        return "\\x%02X" % ord(match.group(0))
-    def _ws_escape(self, data):
-        return self._ws_ptn.sub(self._hex_encode, data)
-
     def _get_encodedData(self, data):
         if not data:
             return '', None
@@ -1213,13 +1135,11 @@ class Property:
             vType = type(data)
             if vType in types.StringTypes and vType != types.UnicodeType:
                 data = unicode(data)
+            data = data.encode('utf-8')
         except:
             pass
-        #data = self._ws_escape(data).encode('utf-8')
-        #data = encode('utf-8')
-        data = data.encode('utf-8')
         if self.encoding == 'base64':
-            return base64_encodestring(data), self.encoding
+            return base64.encodestring(data), self.encoding
         return escape(data), None
         
     def get_encodedName(self):
@@ -1237,9 +1157,9 @@ class Property:
 
     def get_type(self):
         typ = type(self.value)
-        if not _is_py3 and typ == types.InstanceType:
+        if typ == 'instance':
             cn = _class_names(self.value)
-            typ = cn.get('name', None) or cn.get('fullname', None) or typ
+            typ = cn['fullname']
         return typ
     
     def get_typeString(self):
@@ -1290,31 +1210,6 @@ class Property:
                (childStr[:1] == '_')) or \
                childStr == "__builtins__":
                 continue
-            try:
-                # bug 83896 -- treat properties as non-eval-able objects.
-                # We want to display them, but make sure the debugger
-                # doesn't call their getters
-                propObj = getattr(self.value.__class__, childStr)
-                if type(propObj) == property:
-                    self._numchildren += 1
-                    if not countOnly:
-                        c = Property(childStr,
-                                     "%s.%s" % (self.name, childStr),
-                                     propObj,
-                                     self.encoding,
-                                     self.include_private,
-                                     self.include_hiddenTypes)
-                        # Clear the children count to prevent the debugger from
-                        # invoking the getter when the user tries to expand this variable.
-                        # properties don't have interesting children anyway - they hide them.
-                        c._numchildren = 0
-                        children.append(c)
-                    continue
-            except (AttributeError, NameError):
-                pass
-            except:
-                log.exception("Unexpected error trying to get type of getattr(%s, %s)",
-                              self.value.__class__, childStr)
             
             try:
                 child = getattr(self.value, childStr)
@@ -1425,26 +1320,11 @@ class Property:
             
         value = ''
         if vType not in StringTypes:
-            if numchildren == 0 or vType in HiddenTypes:
-                # Removed when writing the py3 port:
-                # or vType == types.InstanceType
-                # This means instance repr's appear only when the code
-                # object has no children.
+            if numchildren == 0 or vType in HiddenTypes or vType == types.InstanceType:
                 value = '<value><![CDATA[%s]]></value>'  % (self.get_valueString()[:maxdata])
         else:
             data, encoding = self.get_encodedValue(maxdata)
             value = '<value encoding="%s"><![CDATA[%s]]></value>'  % (encoding, data)
-
-        #XXX
-        # Rewrite this code to make it clearer:
-        # if vType in StringTypes: emit string type
-        # elif numchildren == 0 or it has a value
-        #       (vType in HiddenTypes or vType == types.InstanceType):
-        #   evaluate as a string, emit base64-encoded
-        #   -- because repr strings can contain XML tex.
-        # else pass, say why we aren't emitting a value
-        #
-        # Most likely it's an optimization 
 
         name, encoding = self.get_encodedName()
         childprops.append('<name encoding="%s"><![CDATA[%s]]></name>' % (encoding, name))
@@ -1564,8 +1444,8 @@ class dbgpClient(clientBase):
         if t and t.tb_frame is f:
             t = t.tb_next
         while f is not None:
-            if f.f_builtins.has_key('DBGPHideChildren') and \
-               f.f_builtins['DBGPHideChildren']:
+            if f.f_globals.has_key('DBGPHideChildren') and \
+               f.f_globals['DBGPHideChildren']:
                 # clear the stack of the children
                 stack = []
             if _hide_stack(f) or f.f_lineno == 0:
@@ -1577,10 +1457,7 @@ class dbgpClient(clientBase):
             f = f.f_back
         stack.reverse()
         
-        # <<max(0, len(stack) - 1)>> sometimes throws an exception.
-        i = len(stack) - 1
-        if i < 0:
-            i = 0
+        i = max(0, len(stack) - 1)
         while t is not None:
             if not _hide_stack(t.tb_frame):
                 stack.append((t.tb_frame, t.tb_lineno))
@@ -1730,9 +1607,6 @@ class dbgpClient(clientBase):
             self._interactiveDebugger = InteractiveDebugger(self, frame)
         return self._interactiveDebugger
 
-    def releaseInteractiveDebugger(self):
-        self._interactiveDebugger = None
-
 _clientInstances = {}
 
 def registerClient(client):
@@ -1822,10 +1696,7 @@ class dbgpSocket:
         while not self._stop:
             log.debug("_getIncomingDataPacket getting data...")
             try:
-                newData = self._socket.recv(1024)
-                if _is_py3:
-                    newData = newData.decode()
-                data = data + newData
+                data = data + self._socket.recv(1024)
             except socket.error, e:
                 # socket was closed on us, quit now
                 log.debug("_getIncomingDataPacket socket closed")
@@ -1837,7 +1708,7 @@ class dbgpSocket:
                 log.debug("_getIncomingDataPacket socket closed")
                 self.queue.put(None)
                 break
-            log.debug("    %d[%r]" , len(data), data)
+            log.debug("    %d[%s]" , len(data), data)
 
             while data:
                 eop = data.find('\0')
@@ -1873,9 +1744,10 @@ class dbgpSocket:
             response = response.encode('utf-8')
         except (UnicodeEncodeError,UnicodeDecodeError), e:
             pass
+        l = len(response)
         #log.debug('sending [%r]', response)
         try:
-            self._socket.send(_encode_response(response))
+            self._socket.send('%d\0%s\0' % (l, response))
         except socket.error, e:
             self.stop()
 
@@ -1956,13 +1828,10 @@ class backend(listcmd.ListCmd):
 
     def stopNow(self):
         self._stop = self._detach = 1
-        self.dbg.stoptrace()
         self.socket.stop()
     
     def detachNow(self):
         self._detach = 1
-        set_thread_support(None)
-        self.dbg.stoptrace()
         self.socket.stop()
         
     def close(self):
@@ -2038,9 +1907,8 @@ class backend(listcmd.ListCmd):
     def runThread(self, target, args, kargs):
         # threads start in run mode
         self._break_status = STATUS_STARTING
-        res = None
         try:
-            res = self.dbg.runcall(target, args, kargs)
+            self.dbg.runcall(target, args, kargs)
             self.send_continuationResult(self._continue, STATUS_STOPPING, REASON_OK)
         except SystemExit, e:  # if someone does a sys.exit(), it's not really an exception.
             self.send_continuationResult(self._continue, STATUS_STOPPED, REASON_ABORTED)
@@ -2057,7 +1925,6 @@ class backend(listcmd.ListCmd):
 
         self.dbg = None
         deregisterClient(self)
-        return res
         
     def runMain(self, debug_args, interactive=0):
         if interactive:
@@ -2077,7 +1944,6 @@ class backend(listcmd.ListCmd):
             if not (self._stop or self._detach):
                 self.send_continuationResult(self._continue, end_status, REASON_EXCEPTION)
             self._stop = self._detach = 1
-            self.dbg.stoptrace()
         except SystemExit, e:  # if someone does a sys.exit(), it's not really an exception.
             if not (self._stop or self._detach):
                 self.send_continuationResult(self._continue, end_status, REASON_ABORTED)
@@ -2186,7 +2052,7 @@ class backend(listcmd.ListCmd):
             return
         _template = '<stream type="%s" encoding="%s">%s</stream>'
         if self._data_encoding == 'base64':
-            data = base64_encodestring(data).rstrip()
+            data = base64.encodestring(data).rstrip()
         else:
             data = escape(data)
 
@@ -2469,11 +2335,12 @@ class backendCmd(backend):
 
     def do_async_detach(self, cmdargs, *args):
         self.do_detach(cmdargs, args)
+        raise DBGPQuit # force a quit
 
     def do_detach(self, cmdargs, *args):
         _template = '<response xmlns="urn:debugger_protocol_v1" command="detach" status="stopped" reason="ok" transaction_id="%s">%s</response>'
         self._continueTransactionId = self._getTransactionId(cmdargs)
-        self._continue = RESUME_GO
+        self._continue = RESUME_STOP
         self.socket.send_response(_template % (self._continueTransactionId,''))
         log.debug('do_detach send response')
         if self._stdin:
@@ -2566,7 +2433,7 @@ class backendCmd(backend):
                 level = level + 1
                 (filename, lineno, where) = _get_stack_data(item)
                 type = 'file'
-                if filename.startswith('<'):
+                if filename[0] == '<':
                     type = filename[1:-1]
                     # XXX if we figure out how to get the source from an exec
                     # statement, we can do something like this: (see do_source)
@@ -2618,12 +2485,9 @@ class backendCmd(backend):
                                    'Invalid context id [%d] requested' % context_id)
 
             ret = []
-            if _supports_keyed_sort:
-                names = sorted(items.keys(), key = str.lower)
-            else:
-                names = items.keys()
-                def mycmp(i,j): return cmp(i.lower(), j.lower())
-                names.sort(mycmp)
+            names = items.keys()
+            def mycmp(i,j): return cmp(i.lower(), j.lower())
+            names.sort(mycmp)
             # Remove __builtins__ everywhere!
             if "__builtins__" in names:
                 names.remove('__builtins__')
@@ -2759,7 +2623,7 @@ class backendCmd(backend):
 
         if self._data_encoding == 'base64':
             try:
-                data = base64_decodestring(data)
+                data = base64.decodestring(data)
             except:
                 pass
 
@@ -2872,7 +2736,7 @@ class backendCmd(backend):
                 filename = url2pathname( filename )
         elif type in ['conditional', 'watch']:
             if data:
-                condition = base64_decodestring(data)
+                condition = base64.decodestring(data)
             else:
                 raise CommandError('breakpoint_set', tid,
                                    ERROR_BREAKPOINT_INVALID,
@@ -3062,7 +2926,7 @@ class backendCmd(backend):
         # read data_length from the socket
         if self._data_encoding == 'base64':
             try:
-                data = base64_decodestring(data)
+                data = base64.decodestring(data)
             except:
                 pass
         data = data + "\n"
@@ -3131,7 +2995,7 @@ class backendCmd(backend):
             source = ''.join(source)
         
         if self._data_encoding == 'base64':
-            source = base64_encodestring(source)
+            source = base64.encodestring(source)
         else:
             source = escape(source)
 
@@ -3166,7 +3030,7 @@ class backendCmd(backend):
         elif self._stdin:
             # read data_length from the socket
             try:
-                data = base64_decodestring(data)
+                data = base64.decodestring(data)
             except:
                 pass
             if data:
@@ -3224,10 +3088,6 @@ class backendCmd(backend):
                     'xmlns:xsd="http://www.w3.org/2001/XMLSchema" ' + \
                     '>%s</response>'
         _map = '<map type="%s" name="%s"%s/>'
-        if _is_py3:
-            objectIndex = object
-        else:
-            objectIndex = types.InstanceType
         commonTypes = {
             types.IntType:      ['int',' xsi:type="xsd:int"'],
             types.LongType:     ['int',' xsi:type="xsd:long"'],
@@ -3237,7 +3097,7 @@ class backendCmd(backend):
             types.ListType:     ['array',''],
             types.TupleType:    ['array',''],
             types.DictType:     ['hash',''],
-            objectIndex:        ['object',''],
+            types.InstanceType: ['object',''],
         }
         if hasattr(types,'BooleanType'):
             commonTypes[types.BooleanType] = ['bool',' xsi:type="xsd:boolean"']
@@ -3287,7 +3147,6 @@ class backendCmd(backend):
             prompt = ""
             status = "break"
             self._break_status = STATUS_BREAK
-            self.dbg.releaseInteractiveDebugger()
             if self._isInteractiveShell:
                 # if we quit interacting, then quit the shell too
                 self.stopNow()
@@ -3295,7 +3154,7 @@ class backendCmd(backend):
                 status = "stopped"
         elif data or self._interactiveBuffer:
             try:
-                data = base64_decodestring(data)
+                data = base64.decodestring(data)
             except:
                 pass
             if data.strip() == "" and len(self._interactiveBuffer) and \
@@ -3463,29 +3322,24 @@ def _thread_start_new_thread(function, args=(), kwargs={}):
     return thread._thread_start_new_thread(_dbgp_start_new_thread, (function, args), kwargs)
 
 def set_thread_support(debug_threads):
-    # lib2to3.py doesn't catch instances of imports inside functions
-    if sys.version_info[0] >= 3:
-        import _thread
-    else:
-        import thread as _thread
-    import threading
+    import thread, threading
     if debug_threads:
-        if not hasattr(_thread, '_thread_start_new_thread'):
-            _thread._thread_start_new_thread = _thread.start_new_thread
-            _thread.start_new_thread = _thread_start_new_thread
+        if not hasattr(thread, '_thread_start_new_thread'):
+            thread._thread_start_new_thread = thread.start_new_thread
+            thread.start_new_thread = _thread_start_new_thread
             threading._start_new_thread = _thread_start_new_thread
     else:
-        if hasattr(_thread, '_thread_start_new_thread'):
-            _thread.start_new_thread = _thread._thread_start_new_thread
-            threading._start_new_thread = _thread.start_new_thread
-            del _thread._thread_start_new_thread
+        if hasattr(thread, '_thread_start_new_thread'):
+            thread.start_new_thread = thread._thread_start_new_thread
+            threading._start_new_thread = thread.start_new_thread
+            del thread._thread_start_new_thread
 
 def stopDBGP(client):
     log.debug("stopDBGP: atexit has been called")
     # prevent stepping into functions we call
     global DBGPHideChildren
     origDBGPHideChildren = DBGPHideChildren
-    DBGPHideChildren = DBGPDebugDebugger is not DBGP_STOPPABLE_ALWAYS
+    DBGPHideChildren = DBGPDebugDebugger is not 2
     try:
         client.atexit()
     finally:
@@ -3498,7 +3352,7 @@ def brk(host = '127.0.0.1', port = 9000, idekey = '',
     # prevent stepping into functions we call
     global DBGPHideChildren
     origDBGPHideChildren = DBGPHideChildren
-    DBGPHideChildren = DBGPDebugDebugger is not DBGP_STOPPABLE_ALWAYS
+    DBGPHideChildren = DBGPDebugDebugger is not 2
     try:
         client = getClientForThread()
         if client:
@@ -3528,10 +3382,8 @@ def brk(host = '127.0.0.1', port = 9000, idekey = '',
         frame = sys._getframe().f_back
     
         # get the filename we were called from
-        scriptArgs = [_filename_from_frame(frame)]
-        # Note: __name__ is not always set, such as when "exec()" was used:
-        #       http://bugs.python.org/issue2903
-        name = frame.f_globals.get('__name__', '<unknown>')
+        scriptArgs = [frame.f_code.co_filename]
+        name = frame.f_globals['__name__']
         # set the thread debugging support now
         set_thread_support(backendCmd.debug_threads)
             
@@ -3554,7 +3406,7 @@ def excepthook(type, value, tb):
     
     global DBGPHideChildren
     origDBGPHideChildren = DBGPHideChildren
-    DBGPHideChildren = DBGPDebugDebugger is not DBGP_STOPPABLE_ALWAYS
+    DBGPHideChildren = DBGPDebugDebugger is not 2
     try:
         # we print the traceback to the regular stdout, since we don't know if or
         # when the IDE will redirect stdin so it can receive the traceback
@@ -3573,7 +3425,7 @@ def excepthook(type, value, tb):
         frame = tb.tb_frame
         
         # get the filename we were called from
-        scriptArgs = [_filename_from_frame(frame)]
+        scriptArgs = [frame.f_code.co_filename]
         name = frame.f_globals['__name__']
         
         # start debugging now
